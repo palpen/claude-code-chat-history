@@ -1,0 +1,59 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    name: Build & release macOS universal .dmg
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust (both darwin targets)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Cache cargo
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install frontend deps
+        run: bun install
+
+      - name: Build & publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Claude Code Chat History ${{ github.ref_name }}"
+          releaseBody: |
+            ## Install
+
+            1. Download the `.dmg` below, drag the app into `/Applications`.
+            2. First launch: right-click the app, pick **Open**. macOS will
+               complain that the developer is unidentified (because this build
+               is not signed) — that's expected. After the first open it
+               launches normally.
+
+            If you prefer the command line:
+
+            ```bash
+            xattr -dr com.apple.quarantine "/Applications/Claude Code Chat History.app"
+            open "/Applications/Claude Code Chat History.app"
+            ```
+          releaseDraft: false
+          prerelease: false
+          args: --target universal-apple-darwin
