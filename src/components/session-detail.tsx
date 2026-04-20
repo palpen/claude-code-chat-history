@@ -1,0 +1,357 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import {
+  copyResumeCommand,
+  exportMarkdown,
+  generateSummary,
+  getTranscript,
+  saveMarkdownToDisk,
+  type SessionRow,
+  type Turn,
+} from "@/lib/ipc";
+import {
+  formatCost,
+  formatDateTime,
+  formatDuration,
+  formatNumber,
+  shortProject,
+} from "@/lib/utils";
+import { openPath } from "@tauri-apps/plugin-opener";
+import { Transcript } from "./transcript";
+
+interface Props {
+  session: SessionRow | null;
+  onSessionPatched: (s: SessionRow) => void;
+}
+
+function heuristicTldr(s: SessionRow): string {
+  if (s.custom_title) return s.custom_title;
+  if (s.first_user_msg) return s.first_user_msg;
+  return "(no user prompts in this session)";
+}
+
+export function SessionDetail({ session, onSessionPatched }: Props) {
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [summaryBusy, setSummaryBusy] = useState(false);
+  const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [resumeCopied, setResumeCopied] = useState(false);
+  const [exportStatus, setExportStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    setTurns([]);
+    setSummaryError(null);
+    setResumeCopied(false);
+    setExportStatus(null);
+    if (!session) return;
+    let cancelled = false;
+    getTranscript(session.session_id).then((t) => {
+      if (!cancelled) setTurns(t);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.session_id]);
+
+  const durationMs = session ? Math.max(0, session.ended_at_ms - session.started_at_ms) : 0;
+  const totalTokens = session
+    ? session.input_tokens +
+      session.output_tokens +
+      session.cache_read_tokens +
+      session.cache_creation_tokens
+    : 0;
+
+  const toolEntries = useMemo(() => {
+    if (!session) return [];
+    return Object.entries(session.tool_calls as Record<string, number>).sort(
+      (a, b) => b[1] - a[1]
+    );
+  }, [session?.tool_calls]);
+
+  const onCopyResume = useCallback(async () => {
+    if (!session) return;
+    await copyResumeCommand(session.session_id);
+    setResumeCopied(true);
+    setTimeout(() => setResumeCopied(false), 2000);
+  }, [session?.session_id]);
+
+  const onGenerateSummary = useCallback(async () => {
+    if (!session) return;
+    setSummaryBusy(true);
+    setSummaryError(null);
+    try {
+      const summary = await generateSummary(session.session_id);
+      onSessionPatched({ ...session, ai_summary: summary });
+    } catch (e) {
+      setSummaryError(String(e));
+    } finally {
+      setSummaryBusy(false);
+    }
+  }, [session, onSessionPatched]);
+
+  const onExport = useCallback(async () => {
+    if (!session) return;
+    setExportStatus(null);
+    try {
+      const md = await exportMarkdown(session.session_id);
+      const path = await saveMarkdownToDisk(session.session_id, md);
+      if (path) setExportStatus(`Saved to ${path}`);
+    } catch (e) {
+      setExportStatus(`Failed: ${e}`);
+    }
+  }, [session?.session_id]);
+
+  const onOpenCwd = useCallback(async () => {
+    if (!session?.cwd) return;
+    await openPath(session.cwd);
+  }, [session?.cwd]);
+
+  if (!session) {
+    return (
+      <div
+        className="flex h-full items-center justify-center text-sm"
+        style={{ color: "var(--text-muted)" }}
+      >
+        Select a conversation from the list.
+      </div>
+    );
+  }
+
+  const title =
+    session.custom_title ||
+    session.first_user_msg?.split("\n")[0]?.slice(0, 120) ||
+    `Session ${session.session_id.slice(0, 8)}`;
+
+  return (
+    <div className="flex h-full flex-col">
+      <div
+        className="border-b px-5 py-4"
+        style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}
+      >
+        <div className="mb-2 flex items-start justify-between gap-4">
+          <h2 className="text-lg font-semibold leading-tight">{title}</h2>
+          <div className="flex shrink-0 gap-2">
+            <button
+              onClick={onCopyResume}
+              className="rounded-md px-3 py-1.5 text-xs font-medium"
+              style={{
+                background: "var(--accent)",
+                color: "white",
+              }}
+            >
+              {resumeCopied ? "Copied ✓" : "Copy resume cmd"}
+            </button>
+            <button
+              onClick={onExport}
+              className="rounded-md border px-3 py-1.5 text-xs font-medium"
+              style={{
+                background: "var(--surface)",
+                borderColor: "var(--border)",
+                color: "var(--text)",
+              }}
+            >
+              Export .md
+            </button>
+            {session.cwd && (
+              <button
+                onClick={onOpenCwd}
+                className="rounded-md border px-3 py-1.5 text-xs font-medium"
+                style={{
+                  background: "var(--surface)",
+                  borderColor: "var(--border)",
+                  color: "var(--text)",
+                }}
+              >
+                Open cwd
+              </button>
+            )}
+          </div>
+        </div>
+        <div
+          className="flex flex-wrap gap-x-4 gap-y-1 text-xs"
+          style={{ color: "var(--text-muted)" }}
+        >
+          <span>
+            <strong style={{ color: "var(--text)" }}>Session:</strong>{" "}
+            <code>{session.session_id}</code>
+          </span>
+          <span>
+            <strong style={{ color: "var(--text)" }}>Project:</strong>{" "}
+            {shortProject(session.project_dir)}
+          </span>
+          {session.git_branch && (
+            <span>
+              <strong style={{ color: "var(--text)" }}>Branch:</strong>{" "}
+              {session.git_branch}
+            </span>
+          )}
+          <span>
+            <strong style={{ color: "var(--text)" }}>Started:</strong>{" "}
+            {formatDateTime(session.started_at_ms)}
+          </span>
+          <span>
+            <strong style={{ color: "var(--text)" }}>Duration:</strong>{" "}
+            {formatDuration(durationMs)}
+          </span>
+        </div>
+        {exportStatus && (
+          <div className="mt-2 text-xs" style={{ color: "var(--text-muted)" }}>
+            {exportStatus}
+          </div>
+        )}
+      </div>
+
+      <div
+        className="border-b px-5 py-4"
+        style={{ borderColor: "var(--border)" }}
+      >
+        <div className="mb-1 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+          TLDR
+        </div>
+        <p className="whitespace-pre-wrap text-sm">{heuristicTldr(session)}</p>
+
+        <div className="mt-3">
+          {session.ai_summary ? (
+            <div
+              className="rounded-md border p-3 text-sm"
+              style={{
+                background: "var(--surface-2)",
+                borderColor: "var(--border)",
+              }}
+            >
+              <div
+                className="mb-1 text-[11px] font-semibold uppercase tracking-wide"
+                style={{ color: "var(--accent)" }}
+              >
+                AI summary
+              </div>
+              <div className="md max-w-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{session.ai_summary}</ReactMarkdown>
+              </div>
+            </div>
+          ) : (
+            <button
+              onClick={onGenerateSummary}
+              disabled={summaryBusy}
+              className="rounded-md border px-3 py-1.5 text-xs font-medium disabled:opacity-50"
+              style={{
+                background: "var(--surface)",
+                borderColor: "var(--border)",
+                color: "var(--text)",
+              }}
+            >
+              {summaryBusy ? "Generating…" : "Generate AI TLDR (Haiku)"}
+            </button>
+          )}
+          {summaryError && (
+            <div
+              className="mt-2 text-xs"
+              style={{ color: "var(--danger)" }}
+            >
+              {summaryError}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div
+        className="grid grid-cols-2 gap-4 border-b px-5 py-4 text-xs md:grid-cols-4"
+        style={{ borderColor: "var(--border)" }}
+      >
+        <Metric label="Messages" value={formatNumber(session.message_count)} />
+        <Metric
+          label="Tokens (total)"
+          value={formatNumber(totalTokens)}
+          sub={`${formatNumber(session.input_tokens)} in / ${formatNumber(session.output_tokens)} out`}
+        />
+        <Metric label="Est. API cost" value={formatCost(session.estimated_cost_usd)} />
+        <Metric
+          label="Models"
+          value={session.models_used.join(", ") || "—"}
+        />
+      </div>
+
+      {toolEntries.length > 0 && (
+        <div
+          className="border-b px-5 py-3"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <div
+            className="mb-2 text-xs font-semibold uppercase tracking-wide"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Tool calls
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {toolEntries.map(([name, count]) => (
+              <span
+                key={name}
+                className="rounded-full px-2 py-0.5 text-xs"
+                style={{
+                  background: "var(--surface-3)",
+                  color: "var(--text)",
+                }}
+              >
+                {name} ·{" "}
+                <span style={{ color: "var(--text-muted)" }}>{count}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {session.files_touched.length > 0 && (
+        <details
+          className="border-b px-5 py-3"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+            Files touched ({session.files_touched.length})
+          </summary>
+          <ul className="mt-2 space-y-0.5 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
+            {session.files_touched.map((p) => (
+              <li key={p} className="truncate" title={p}>
+                {p}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      <div className="flex-1 min-h-0">
+        <Transcript turns={turns} />
+      </div>
+    </div>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+}) {
+  return (
+    <div>
+      <div
+        className="text-[10px] font-semibold uppercase tracking-wide"
+        style={{ color: "var(--text-muted)" }}
+      >
+        {label}
+      </div>
+      <div className="mt-0.5 text-sm font-medium">{value}</div>
+      {sub && (
+        <div
+          className="text-[11px]"
+          style={{ color: "var(--text-muted)" }}
+        >
+          {sub}
+        </div>
+      )}
+    </div>
+  );
+}
+

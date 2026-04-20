@@ -1,0 +1,37 @@
+[package]
+name = "claude-code-chat-history"
+version = "0.1.0"
+description = "Browse, search, and resurface past Claude Code sessions."
+authors = ["pspenano"]
+edition = "2021"
+
+[lib]
+name = "claude_code_chat_history_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-dialog = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+rusqlite = { version = "0.32", features = ["bundled"] }
+anyhow = "1"
+thiserror = "2"
+chrono = { version = "0.4", features = ["serde"] }
+walkdir = "2"
+notify = "7"
+notify-debouncer-full = "0.4"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time", "process"] }
+dirs = "5"
+once_cell = "1"
+parking_lot = "0.12"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

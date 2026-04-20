@@ -1,0 +1,34 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies & build output
+node_modules
+dist
+dist-ssr
+*.local
+
+# Rust
+src-tauri/target
+# (Cargo.lock IS committed — this is an application, not a library)
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Local app data (never committed — this is the user's own conversation index)
+/.claude/history-ui/
