@@ -133,6 +133,7 @@ export function SessionList(props: Props) {
               return (
                 <button
                   key={s.session_id}
+                  data-session-id={s.session_id}
                   onClick={() => props.onSelect(s.session_id)}
                   className={cn(
                     "block w-full text-left px-3 py-2 text-sm border-b",
