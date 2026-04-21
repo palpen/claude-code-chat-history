@@ -19,6 +19,24 @@ A fast, local, searchable browser for every Claude Code session on your machine.
 
 ## Install
 
+Grab the latest universal macOS build from the **[Releases page](https://github.com/palpen/claude-code-chat-history/releases/latest)** (Apple Silicon + Intel in one `.dmg`).
+
+1. Download `Claude.Code.Chat.History_*_universal.dmg`.
+2. Open the `.dmg` and drag the app into `/Applications`.
+3. First launch: right-click the app → **Open**. macOS will warn that the developer is unidentified (the build isn't code-signed) — click **Open** once and it launches normally every time after.
+
+If you prefer the terminal:
+
+```bash
+# Remove the quarantine flag so the app launches without the warning dialog
+xattr -dr com.apple.quarantine "/Applications/Claude Code Chat History.app"
+open "/Applications/Claude Code Chat History.app"
+```
+
+The index is stored at `~/.claude/history-ui/index.db`. Delete it any time — it rebuilds on next launch.
+
+## Build from source
+
 Prerequisites: [Rust](https://rustup.rs) (stable) + [Bun](https://bun.sh) or Node ≥ 20.
 
 ```bash
@@ -28,8 +46,6 @@ bun install
 bun run tauri dev      # run in dev mode
 bun run tauri build    # build a standalone .app (drag into /Applications)
 ```
-
-The index is stored at `~/.claude/history-ui/index.db`. Delete it any time — it rebuilds on next launch.
 
 ## Optional env vars
 
