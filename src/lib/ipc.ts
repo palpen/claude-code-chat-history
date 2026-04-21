@@ -46,6 +46,23 @@ export interface ToolUse {
   input_preview: string;
 }
 
+export type SortKey =
+  | "newest"
+  | "oldest"
+  | "modified"
+  | "project"
+  | "messages"
+  | "cost";
+
+export const SORT_OPTIONS: ReadonlyArray<{ key: SortKey; label: string }> = [
+  { key: "newest", label: "Newest first" },
+  { key: "oldest", label: "Oldest first" },
+  { key: "modified", label: "Recently modified" },
+  { key: "project", label: "Project name (A–Z)" },
+  { key: "messages", label: "Most messages" },
+  { key: "cost", label: "Highest estimated cost" },
+];
+
 export interface ListArgs {
   query?: string;
   projectDir?: string;
@@ -53,6 +70,7 @@ export interface ListArgs {
   startedAfterMs?: number;
   startedBeforeMs?: number;
   limit?: number;
+  sortBy?: SortKey;
 }
 
 export async function listSessions(args: ListArgs = {}): Promise<SessionRow[]> {

@@ -6,6 +6,7 @@ import {
   listProjects,
   listSessions,
   type SessionRow,
+  type SortKey,
 } from "@/lib/ipc";
 import { SessionList } from "@/components/session-list";
 import { SessionDetail } from "@/components/session-detail";
@@ -20,6 +21,7 @@ export default function App() {
   const [query, setQuery] = useState("");
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   const [modelFilter, setModelFilter] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<SortKey>("newest");
   const [sessions, setSessions] = useState<SessionRow[]>([]);
   const [pinnedSessions, setPinnedSessions] = useState<SessionRow[]>([]);
   const [projects, setProjects] = useState<Array<[string, number]>>([]);
@@ -60,13 +62,14 @@ export default function App() {
         query: query.trim() || undefined,
         projectDir: projectFilter ?? undefined,
         modelContains: modelFilter ?? undefined,
+        sortBy,
       });
       if (reqIdRef.current !== reqId) return;
       setSessions(rows);
     } finally {
       if (reqIdRef.current === reqId) setLoading(false);
     }
-  }, [query, projectFilter, modelFilter]);
+  }, [query, projectFilter, modelFilter, sortBy]);
 
   useEffect(() => {
     const t = setTimeout(fetchSessions, 150);
@@ -318,6 +321,8 @@ export default function App() {
               onProjectFilterChange={setProjectFilter}
               modelFilter={modelFilter}
               onModelFilterChange={setModelFilter}
+              sortBy={sortBy}
+              onSortByChange={setSortBy}
               loading={loading}
               searchInputRef={searchInputRef}
               onPinToggled={onPinToggled}

@@ -1,6 +1,11 @@
 import { useMemo, useState, type Ref } from "react";
 import { Loader2, Star } from "lucide-react";
-import { setSessionPinned, type SessionRow } from "@/lib/ipc";
+import {
+  SORT_OPTIONS,
+  setSessionPinned,
+  type SessionRow,
+  type SortKey,
+} from "@/lib/ipc";
 import {
   cn,
   formatRelative,
@@ -20,6 +25,8 @@ interface Props {
   onProjectFilterChange: (p: string | null) => void;
   modelFilter: string | null;
   onModelFilterChange: (m: string | null) => void;
+  sortBy: SortKey;
+  onSortByChange: (k: SortKey) => void;
   loading: boolean;
   searchInputRef?: Ref<HTMLInputElement>;
   onPinToggled: () => void;
@@ -237,6 +244,23 @@ export function SessionList(props: Props) {
             {MODEL_OPTIONS.map((m) => (
               <option key={m} value={m}>
                 {m[0].toUpperCase() + m.slice(1)}
+              </option>
+            ))}
+          </select>
+          <select
+            value={props.sortBy}
+            onChange={(e) => props.onSortByChange(e.target.value as SortKey)}
+            className="rounded-md px-2 py-1 outline-none"
+            style={{
+              background: "var(--surface)",
+              color: "var(--text)",
+              border: "1px solid var(--border)",
+            }}
+            title="Sort sessions"
+          >
+            {SORT_OPTIONS.map((opt) => (
+              <option key={opt.key} value={opt.key}>
+                {opt.label}
               </option>
             ))}
           </select>
