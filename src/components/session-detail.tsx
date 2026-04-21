@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { Star } from "lucide-react";
 import {
   copyResumeCommand,
   exportMarkdown,
   generateSummary,
   getTranscript,
   saveMarkdownToDisk,
+  setSessionPinned,
   type SessionRow,
   type Turn,
 } from "@/lib/ipc";
@@ -23,6 +25,7 @@ import { Transcript } from "./transcript";
 interface Props {
   session: SessionRow | null;
   onSessionPatched: (s: SessionRow) => void;
+  onPinToggled: () => void;
 }
 
 function heuristicTldr(s: SessionRow): string {
@@ -31,7 +34,7 @@ function heuristicTldr(s: SessionRow): string {
   return "(no user prompts in this session)";
 }
 
-export function SessionDetail({ session, onSessionPatched }: Props) {
+export function SessionDetail({ session, onSessionPatched, onPinToggled }: Props) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [summaryBusy, setSummaryBusy] = useState(false);
   const [summaryError, setSummaryError] = useState<string | null>(null);
@@ -110,6 +113,13 @@ export function SessionDetail({ session, onSessionPatched }: Props) {
     }
   }, [session?.cwd]);
 
+  const onTogglePin = useCallback(async () => {
+    if (!session) return;
+    const nextPinned = session.pinned_at === null;
+    await setSessionPinned(session.session_id, nextPinned);
+    onPinToggled();
+  }, [session, onPinToggled]);
+
   if (!session) {
     return (
       <div
@@ -145,6 +155,23 @@ export function SessionDetail({ session, onSessionPatched }: Props) {
             {title}
           </h2>
           <div className="flex shrink-0 gap-2">
+            <button
+              onClick={onTogglePin}
+              aria-label={session.pinned_at === null ? "Pin session" : "Unpin session"}
+              title={session.pinned_at === null ? "Pin" : "Unpin"}
+              className="rounded-md border px-2 py-1.5 text-xs font-medium"
+              style={{
+                background: "var(--surface)",
+                borderColor: "var(--border)",
+                color: session.pinned_at === null ? "var(--text-muted)" : "var(--accent)",
+              }}
+            >
+              <Star
+                size={14}
+                fill={session.pinned_at === null ? "none" : "currentColor"}
+                strokeWidth={1.75}
+              />
+            </button>
             <button
               onClick={onCopyResume}
               className="rounded-md px-3 py-1.5 text-xs font-medium"

@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import {
+  listPinnedSessions,
   listProjects,
   listSessions,
   type SessionRow,
 } from "@/lib/ipc";
 import { SessionList } from "@/components/session-list";
 import { SessionDetail } from "@/components/session-detail";
+import { isMac } from "@/lib/utils";
 
 const DEFAULT_LEFT_WIDTH = 380;
 
@@ -15,12 +17,14 @@ export default function App() {
   const [projectFilter, setProjectFilter] = useState<string | null>(null);
   const [modelFilter, setModelFilter] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionRow[]>([]);
+  const [pinnedSessions, setPinnedSessions] = useState<SessionRow[]>([]);
   const [projects, setProjects] = useState<Array<[string, number]>>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const [leftWidth, setLeftWidth] = useState(DEFAULT_LEFT_WIDTH);
   const dragRef = useRef<{ startX: number; startW: number } | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // debounced fetch
   const reqIdRef = useRef(0);
@@ -45,39 +49,51 @@ export default function App() {
     return () => clearTimeout(t);
   }, [fetchSessions]);
 
+  const fetchPinned = useCallback(() => {
+    listPinnedSessions().then(setPinnedSessions);
+  }, []);
+
   useEffect(() => {
     listProjects().then(setProjects);
-  }, []);
+    fetchPinned();
+  }, [fetchPinned]);
 
   useEffect(() => {
     const un = listen("sessions-updated", () => {
       fetchSessions();
+      fetchPinned();
       listProjects().then(setProjects);
     });
     return () => {
       un.then((fn) => fn());
     };
-  }, [fetchSessions]);
+  }, [fetchSessions, fetchPinned]);
 
-  const selected = useMemo(
-    () => sessions.find((s) => s.session_id === selectedId) ?? null,
-    [sessions, selectedId]
+  const pinnedIds = useMemo(
+    () => new Set(pinnedSessions.map((s) => s.session_id)),
+    [pinnedSessions]
   );
 
-  // Sessions in the order they are rendered on screen (grouped by project,
-  // insertion-order-preserving). Arrow-key navigation must follow this order,
-  // not the raw chronological order from the backend.
+  const selected = useMemo(() => {
+    const byId = (s: SessionRow) => s.session_id === selectedId;
+    return pinnedSessions.find(byId) ?? sessions.find(byId) ?? null;
+  }, [sessions, pinnedSessions, selectedId]);
+
+  // Sessions in the order they are rendered on screen (pinned first, then
+  // grouped by project, insertion-order-preserving). Arrow-key navigation
+  // must follow this visual order.
   const visualOrder = useMemo(() => {
+    const flat: SessionRow[] = [...pinnedSessions];
     const byProject = new Map<string, SessionRow[]>();
     for (const s of sessions) {
+      if (pinnedIds.has(s.session_id)) continue;
       const key = s.project_dir;
       if (!byProject.has(key)) byProject.set(key, []);
       byProject.get(key)!.push(s);
     }
-    const flat: SessionRow[] = [];
     for (const rows of byProject.values()) flat.push(...rows);
     return flat;
-  }, [sessions]);
+  }, [sessions, pinnedSessions, pinnedIds]);
 
   // Auto-select first session when query changes and current selection falls off.
   useEffect(() => {
@@ -123,11 +139,58 @@ export default function App() {
     el?.scrollIntoView({ block: "nearest" });
   }, [selectedId]);
 
+  // Shortcuts to focus and clear the search input.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const input = searchInputRef.current;
+
+      const modKey = isMac() ? e.metaKey : e.ctrlKey;
+      if (modKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        input?.focus();
+        input?.select();
+        return;
+      }
+
+      if (e.key === "/") {
+        if (target?.isContentEditable) return;
+        const tag = target?.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        e.preventDefault();
+        input?.focus();
+        input?.select();
+        return;
+      }
+
+      if (e.key === "Escape") {
+        // Only handle Esc when the search input is focused — otherwise leave
+        // it alone so it can close dialogs, details, etc.
+        if (target !== input) return;
+        if (query.length > 0) {
+          setQuery("");
+        } else {
+          input?.blur();
+        }
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [query]);
+
   const onSessionPatched = useCallback((patched: SessionRow) => {
     setSessions((rows) =>
       rows.map((r) => (r.session_id === patched.session_id ? patched : r))
     );
+    setPinnedSessions((rows) =>
+      rows.map((r) => (r.session_id === patched.session_id ? patched : r))
+    );
   }, []);
+
+  const onPinToggled = useCallback(() => {
+    fetchPinned();
+    fetchSessions();
+  }, [fetchPinned, fetchSessions]);
 
   const onDragStart = (e: React.MouseEvent<HTMLDivElement>) => {
     dragRef.current = { startX: e.clientX, startW: leftWidth };
@@ -153,6 +216,7 @@ export default function App() {
       <div style={{ width: leftWidth, flex: "0 0 auto" }}>
         <SessionList
           sessions={sessions}
+          pinnedSessions={pinnedSessions}
           projects={projects}
           selectedId={selectedId}
           onSelect={setSelectedId}
@@ -163,6 +227,8 @@ export default function App() {
           modelFilter={modelFilter}
           onModelFilterChange={setModelFilter}
           loading={loading}
+          searchInputRef={searchInputRef}
+          onPinToggled={onPinToggled}
         />
       </div>
       <div
@@ -171,7 +237,11 @@ export default function App() {
         style={{ background: "var(--border)" }}
       />
       <div className="flex-1 min-w-0">
-        <SessionDetail session={selected} onSessionPatched={onSessionPatched} />
+        <SessionDetail
+          session={selected}
+          onSessionPatched={onSessionPatched}
+          onPinToggled={onPinToggled}
+        />
       </div>
     </div>
   );

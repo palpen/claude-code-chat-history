@@ -25,6 +25,7 @@ export interface SessionRow {
   tool_calls: Record<string, number>;
   files_touched: string[];
   claude_version: string | null;
+  pinned_at: number | null;
   snippet: string | null;
 }
 
@@ -95,4 +96,12 @@ export async function saveMarkdownToDisk(sessionId: string, md: string): Promise
 
 export async function reindex(): Promise<{ total: number; indexed: number; skipped: number }> {
   return invoke("reindex");
+}
+
+export async function setSessionPinned(sessionId: string, pinned: boolean): Promise<void> {
+  return invoke("set_session_pinned", { sessionId, pinned });
+}
+
+export async function listPinnedSessions(): Promise<SessionRow[]> {
+  return invoke<SessionRow[]>("list_pinned_sessions");
 }

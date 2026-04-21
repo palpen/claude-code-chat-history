@@ -57,6 +57,10 @@ export function basename(p: string | null | undefined): string {
   return parts[parts.length - 1] ?? p;
 }
 
+export function isMac(): boolean {
+  return typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+}
+
 export function shortProject(p: string): string {
   const home = "/Users/";
   if (p.startsWith(home)) {
