@@ -21,12 +21,27 @@ interface Props {
   loading: boolean;
 }
 
+function stripCaveat(raw: string): string {
+  // Claude Code injects a <local-command-caveat>Caveat: The messages below…</local-command-caveat>
+  // wrapper ahead of the real prompt. Strip it (and any whitespace) so the
+  // visible title is the user's actual first sentence.
+  let s = raw.replace(/<local-command-caveat>[\s\S]*?<\/local-command-caveat>/gi, "").trim();
+  // Some sessions leave a bare "Caveat: …" paragraph with no tags.
+  if (/^caveat:/i.test(s)) {
+    const nl = s.indexOf("\n");
+    s = nl === -1 ? "" : s.slice(nl + 1).trim();
+  }
+  return s;
+}
+
 function titleFor(s: SessionRow): string {
   if (s.custom_title) return s.custom_title;
-  const msg = s.first_user_msg?.trim();
-  if (msg) {
-    const firstLine = msg.split("\n")[0];
-    return firstLine.length > 80 ? firstLine.slice(0, 80) + "…" : firstLine;
+  const cleaned = stripCaveat(s.first_user_msg ?? "");
+  if (cleaned) {
+    const firstLine = cleaned.split("\n").find((l) => l.trim().length > 0) ?? "";
+    if (firstLine) {
+      return firstLine.length > 80 ? firstLine.slice(0, 80) + "…" : firstLine;
+    }
   }
   return `Session ${s.session_id.slice(0, 8)}`;
 }
@@ -54,7 +69,7 @@ export function SessionList(props: Props) {
 
   return (
     <div className="flex h-full flex-col border-r" style={{ borderColor: "var(--border)" }}>
-      <div className="p-3 space-y-2 border-b" style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}>
+      <div className="p-3 space-y-2" style={{ background: "var(--surface-2)" }}>
         <input
           type="text"
           placeholder="Search conversations…"
@@ -117,13 +132,19 @@ export function SessionList(props: Props) {
           </div>
         )}
         {grouped.map(([project, rows]) => (
-          <div key={project}>
+          <div key={project} className="pb-2">
             <div
-              className="px-3 py-2 text-xs font-medium uppercase tracking-wide"
-              style={{ color: "var(--text-muted)", background: "var(--surface-2)" }}
+              className="sticky top-0 z-10 px-3 pb-1.5 pt-3 text-[10.5px] font-semibold uppercase tracking-[0.08em]"
+              style={{
+                color: "var(--accent)",
+                background: "var(--surface-2)",
+                borderBottom: "1px solid var(--border)",
+              }}
             >
               {shortProject(project)}{" "}
-              <span style={{ opacity: 0.6 }}>· {rows.length}</span>
+              <span style={{ color: "var(--text-muted)", opacity: 0.8 }}>
+                · {rows.length}
+              </span>
             </div>
             {rows.map((s) => {
               const title = titleFor(s);
@@ -136,32 +157,40 @@ export function SessionList(props: Props) {
                   data-session-id={s.session_id}
                   onClick={() => props.onSelect(s.session_id)}
                   className={cn(
-                    "block w-full text-left px-3 py-2 text-sm border-b",
-                    "hover:bg-[var(--surface-2)]",
-                    isSelected && "bg-[var(--surface-3)]"
+                    "block w-full text-left pr-3 py-2 text-sm",
+                    "transition-colors",
+                    !isSelected && "hover:bg-[var(--surface-2)]"
                   )}
-                  style={{ borderColor: "var(--border)" }}
+                  style={{
+                    paddingLeft: "20px",
+                    borderLeft: `2px solid ${isSelected ? "var(--accent)" : "transparent"}`,
+                    background: isSelected ? "var(--accent-soft)" : "transparent",
+                  }}
                 >
-                  <div className="truncate font-medium" title={title}>
+                  <div
+                    className="truncate font-medium"
+                    style={{ fontSize: "14px" }}
+                    title={title}
+                  >
                     {title}
                   </div>
                   {s.snippet && (
                     <div
-                      className="truncate text-xs mt-0.5"
-                      style={{ color: "var(--text-muted)" }}
+                      className="truncate mt-1"
+                      style={{ color: "var(--text-muted)", fontSize: "12px" }}
                       dangerouslySetInnerHTML={{ __html: sanitizeSnippet(s.snippet) }}
                     />
                   )}
                   <div
-                    className="mt-1 flex items-center gap-2 text-xs"
-                    style={{ color: "var(--text-muted)" }}
+                    className="mt-1 flex items-center gap-2"
+                    style={{ color: "var(--text-muted)", fontSize: "11px" }}
                   >
                     <span>{formatRelative(s.ended_at_ms || s.started_at_ms)}</span>
-                    <span>·</span>
+                    <span aria-hidden="true">·</span>
                     <span>{s.message_count} msgs</span>
                     {uniqueModels.length > 0 && (
                       <>
-                        <span>·</span>
+                        <span aria-hidden="true">·</span>
                         {uniqueModels.map((m) => (
                           <span
                             key={m}

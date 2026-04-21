@@ -125,11 +125,21 @@ export function SessionDetail({ session, onSessionPatched }: Props) {
   return (
     <div className="flex h-full flex-col">
       <div
-        className="border-b px-5 py-4"
-        style={{ borderColor: "var(--border)", background: "var(--surface-2)" }}
+        className="px-5 py-4"
+        style={{ background: "var(--surface-2)" }}
       >
         <div className="mb-2 flex items-start justify-between gap-4">
-          <h2 className="text-lg font-semibold leading-tight">{title}</h2>
+          <h2
+            className="leading-tight"
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: "20px",
+              fontWeight: 500,
+              letterSpacing: "-0.005em",
+            }}
+          >
+            {title}
+          </h2>
           <div className="flex shrink-0 gap-2">
             <button
               onClick={onCopyResume}
@@ -201,11 +211,15 @@ export function SessionDetail({ session, onSessionPatched }: Props) {
         )}
       </div>
 
-      <div
-        className="border-b px-5 py-4"
-        style={{ borderColor: "var(--border)" }}
-      >
-        <div className="mb-1 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+      <div className="px-5 pt-4 pb-3">
+        <div
+          className="mb-1.5 font-semibold uppercase tracking-[0.08em]"
+          style={{
+            color: "var(--text-muted)",
+            opacity: 0.85,
+            fontSize: "10.5px",
+          }}
+        >
           TLDR
         </div>
         <p className="whitespace-pre-wrap text-sm">{heuristicTldr(session)}</p>
@@ -254,10 +268,7 @@ export function SessionDetail({ session, onSessionPatched }: Props) {
         </div>
       </div>
 
-      <div
-        className="grid grid-cols-2 gap-4 border-b px-5 py-4 text-xs md:grid-cols-4"
-        style={{ borderColor: "var(--border)" }}
-      >
+      <div className="grid grid-cols-2 gap-2 px-5 py-3 text-xs md:grid-cols-4">
         <Metric label="Messages" value={formatNumber(session.message_count)} />
         <Metric
           label="Tokens (total)"
@@ -272,13 +283,14 @@ export function SessionDetail({ session, onSessionPatched }: Props) {
       </div>
 
       {toolEntries.length > 0 && (
-        <div
-          className="border-b px-5 py-3"
-          style={{ borderColor: "var(--border)" }}
-        >
+        <div className="px-5 py-3">
           <div
-            className="mb-2 text-xs font-semibold uppercase tracking-wide"
-            style={{ color: "var(--text-muted)" }}
+            className="mb-2 font-semibold uppercase tracking-[0.08em]"
+            style={{
+              color: "var(--text-muted)",
+              opacity: 0.85,
+              fontSize: "10.5px",
+            }}
           >
             Tool calls
           </div>
@@ -288,8 +300,8 @@ export function SessionDetail({ session, onSessionPatched }: Props) {
                 key={name}
                 className="rounded-full px-2 py-0.5 text-xs"
                 style={{
-                  background: "var(--surface-3)",
-                  color: "var(--text)",
+                  background: "var(--accent-soft)",
+                  color: "var(--accent)",
                 }}
               >
                 {name} ·{" "}
@@ -301,11 +313,15 @@ export function SessionDetail({ session, onSessionPatched }: Props) {
       )}
 
       {session.files_touched.length > 0 && (
-        <details
-          className="border-b px-5 py-3"
-          style={{ borderColor: "var(--border)" }}
-        >
-          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+        <details className="px-5 py-3">
+          <summary
+            className="cursor-pointer font-semibold uppercase tracking-[0.08em]"
+            style={{
+              color: "var(--text-muted)",
+              opacity: 0.85,
+              fontSize: "10.5px",
+            }}
+          >
             Files touched ({session.files_touched.length})
           </summary>
           <ul className="mt-2 space-y-0.5 font-mono text-xs" style={{ color: "var(--text-muted)" }}>
@@ -335,17 +351,27 @@ function Metric({
   sub?: string;
 }) {
   return (
-    <div>
+    <div
+      className="rounded-lg border px-3 py-2.5"
+      style={{
+        background: "var(--surface-2)",
+        borderColor: "var(--border)",
+      }}
+    >
       <div
-        className="text-[10px] font-semibold uppercase tracking-wide"
-        style={{ color: "var(--text-muted)" }}
+        className="font-semibold uppercase tracking-[0.08em]"
+        style={{
+          color: "var(--text-muted)",
+          opacity: 0.85,
+          fontSize: "10px",
+        }}
       >
         {label}
       </div>
-      <div className="mt-0.5 text-sm font-medium">{value}</div>
+      <div className="mt-1 text-base font-medium leading-tight">{value}</div>
       {sub && (
         <div
-          className="text-[11px]"
+          className="mt-0.5 text-[11px]"
           style={{ color: "var(--text-muted)" }}
         >
           {sub}

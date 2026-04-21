@@ -15,9 +15,8 @@ function TurnCard({ turn }: { turn: Turn }) {
 
   return (
     <div
-      className="px-4 py-3 border-b"
+      className="px-5 py-4"
       style={{
-        borderColor: "var(--border)",
         background: isUser ? "var(--surface-2)" : "var(--surface)",
       }}
     >
