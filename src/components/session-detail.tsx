@@ -103,7 +103,11 @@ export function SessionDetail({ session, onSessionPatched }: Props) {
 
   const onOpenCwd = useCallback(async () => {
     if (!session?.cwd) return;
-    await openPath(session.cwd);
+    try {
+      await openPath(session.cwd);
+    } catch (e) {
+      console.error("Open cwd failed:", e);
+    }
   }, [session?.cwd]);
 
   if (!session) {
