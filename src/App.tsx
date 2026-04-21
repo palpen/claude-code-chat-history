@@ -64,12 +64,64 @@ export default function App() {
     [sessions, selectedId]
   );
 
+  // Sessions in the order they are rendered on screen (grouped by project,
+  // insertion-order-preserving). Arrow-key navigation must follow this order,
+  // not the raw chronological order from the backend.
+  const visualOrder = useMemo(() => {
+    const byProject = new Map<string, SessionRow[]>();
+    for (const s of sessions) {
+      const key = s.project_dir;
+      if (!byProject.has(key)) byProject.set(key, []);
+      byProject.get(key)!.push(s);
+    }
+    const flat: SessionRow[] = [];
+    for (const rows of byProject.values()) flat.push(...rows);
+    return flat;
+  }, [sessions]);
+
   // Auto-select first session when query changes and current selection falls off.
   useEffect(() => {
-    if (!selected && sessions.length > 0) {
-      setSelectedId(sessions[0].session_id);
+    if (!selected && visualOrder.length > 0) {
+      setSelectedId(visualOrder[0].session_id);
     }
-  }, [selected, sessions]);
+  }, [selected, visualOrder]);
+
+  // Arrow-key navigation across the session list (visual order).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+      const target = e.target as HTMLElement | null;
+      if (target?.isContentEditable) return;
+      if (target?.tagName === "TEXTAREA") return;
+      if (target?.tagName === "SELECT") return;
+      if (visualOrder.length === 0) return;
+
+      const currentIdx = visualOrder.findIndex(
+        (s) => s.session_id === selectedId
+      );
+      const start = currentIdx >= 0 ? currentIdx : 0;
+      const delta = e.key === "ArrowDown" ? 1 : -1;
+      const next = Math.max(
+        0,
+        Math.min(visualOrder.length - 1, start + delta)
+      );
+      if (visualOrder[next].session_id !== selectedId) {
+        setSelectedId(visualOrder[next].session_id);
+      }
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [visualOrder, selectedId]);
+
+  // Keep the selected row visible in the list.
+  useEffect(() => {
+    if (!selectedId) return;
+    const el = document.querySelector<HTMLElement>(
+      `[data-session-id="${selectedId}"]`
+    );
+    el?.scrollIntoView({ block: "nearest" });
+  }, [selectedId]);
 
   const onSessionPatched = useCallback((patched: SessionRow) => {
     setSessions((rows) =>
