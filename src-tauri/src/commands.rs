@@ -36,6 +36,7 @@ pub struct SessionRow {
     pub tool_calls: serde_json::Value,
     pub files_touched: Vec<String>,
     pub claude_version: Option<String>,
+    pub pinned_at: Option<i64>,
     #[serde(default)]
     pub snippet: Option<String>,
 }
@@ -80,6 +81,7 @@ fn row_from_raw(
     tool_calls_json: String,
     files_touched_json: String,
     claude_version: Option<String>,
+    pinned_at: Option<i64>,
     snippet: Option<String>,
 ) -> SessionRow {
     let models_used: Vec<String> = serde_json::from_str(&models_used_json).unwrap_or_default();
@@ -109,6 +111,7 @@ fn row_from_raw(
         tool_calls,
         files_touched,
         claude_version,
+        pinned_at,
         snippet,
     }
 }
@@ -140,7 +143,7 @@ pub fn list_sessions(state: State<'_, AppState>, args: ListArgs) -> std::result:
                    s.input_tokens, s.output_tokens, s.cache_read_tokens, s.cache_creation_tokens,
                    s.estimated_cost_usd, s.has_errors,
                    s.models_used_json, s.tool_calls_json, s.files_touched_json,
-                   s.claude_version,
+                   s.claude_version, s.pinned_at,
                    snippet(sessions_fts, 4, '<mark>', '</mark>', '…', 12) AS snippet
             FROM sessions_fts
             JOIN sessions s USING(session_id)
@@ -178,7 +181,7 @@ pub fn list_sessions(state: State<'_, AppState>, args: ListArgs) -> std::result:
                     r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?,
                     r.get(7)?, r.get(8)?, r.get(9)?, r.get(10)?, r.get(11)?, r.get(12)?, r.get(13)?,
                     r.get(14)?, r.get(15)?, r.get(16)?, r.get(17)?, r.get(18)?, r.get(19)?, r.get(20)?,
-                    r.get(21)?, r.get(22)?,
+                    r.get(21)?, r.get(22)?, r.get(23)?,
                 ))
             })
             .map_err(|e| e.to_string())?;
@@ -223,7 +226,7 @@ pub fn list_sessions(state: State<'_, AppState>, args: ListArgs) -> std::result:
                    input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
                    estimated_cost_usd, has_errors,
                    models_used_json, tool_calls_json, files_touched_json,
-                   claude_version
+                   claude_version, pinned_at
             FROM sessions
             {where_clause}
             ORDER BY started_at_ms DESC
@@ -241,7 +244,7 @@ pub fn list_sessions(state: State<'_, AppState>, args: ListArgs) -> std::result:
                     r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?,
                     r.get(7)?, r.get(8)?, r.get(9)?, r.get(10)?, r.get(11)?, r.get(12)?, r.get(13)?,
                     r.get(14)?, r.get(15)?, r.get(16)?, r.get(17)?, r.get(18)?, r.get(19)?, r.get(20)?,
-                    r.get(21)?, None,
+                    r.get(21)?, r.get(22)?, None,
                 ))
             })
             .map_err(|e| e.to_string())?;
@@ -337,7 +340,7 @@ pub fn get_session(
                    input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
                    estimated_cost_usd, has_errors,
                    models_used_json, tool_calls_json, files_touched_json,
-                   claude_version
+                   claude_version, pinned_at
             FROM sessions WHERE session_id = ?1
             "#,
             params![session_id],
@@ -346,7 +349,7 @@ pub fn get_session(
                     r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?,
                     r.get(7)?, r.get(8)?, r.get(9)?, r.get(10)?, r.get(11)?, r.get(12)?, r.get(13)?,
                     r.get(14)?, r.get(15)?, r.get(16)?, r.get(17)?, r.get(18)?, r.get(19)?, r.get(20)?,
-                    r.get(21)?, None,
+                    r.get(21)?, r.get(22)?, None,
                 ))
             },
         )
@@ -466,6 +469,71 @@ pub fn export_markdown(
 #[tauri::command]
 pub fn resume_command(session_id: String) -> std::result::Result<String, String> {
     Ok(format!("claude --resume {}", session_id))
+}
+
+#[tauri::command]
+pub fn set_session_pinned(
+    state: State<'_, AppState>,
+    session_id: String,
+    pinned: bool,
+) -> std::result::Result<(), String> {
+    let conn = state.db.lock();
+    if pinned {
+        conn.execute(
+            "UPDATE sessions SET pinned_at = ?1 WHERE session_id = ?2",
+            params![
+                chrono::Utc::now().timestamp_millis(),
+                session_id,
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+    } else {
+        conn.execute(
+            "UPDATE sessions SET pinned_at = NULL WHERE session_id = ?1",
+            params![session_id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn list_pinned_sessions(
+    state: State<'_, AppState>,
+) -> std::result::Result<Vec<SessionRow>, String> {
+    let conn = state.db.lock();
+    let mut stmt = conn
+        .prepare(
+            r#"
+            SELECT session_id, project_dir, cwd, git_branch,
+                   custom_title, first_user_msg, ai_summary,
+                   started_at_ms, ended_at_ms,
+                   message_count, user_message_count, assistant_message_count,
+                   input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
+                   estimated_cost_usd, has_errors,
+                   models_used_json, tool_calls_json, files_touched_json,
+                   claude_version, pinned_at
+            FROM sessions
+            WHERE pinned_at IS NOT NULL
+            ORDER BY pinned_at DESC
+            "#,
+        )
+        .map_err(|e| e.to_string())?;
+    let rows_iter = stmt
+        .query_map([], |r| {
+            Ok(row_from_raw(
+                r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?,
+                r.get(7)?, r.get(8)?, r.get(9)?, r.get(10)?, r.get(11)?, r.get(12)?, r.get(13)?,
+                r.get(14)?, r.get(15)?, r.get(16)?, r.get(17)?, r.get(18)?, r.get(19)?, r.get(20)?,
+                r.get(21)?, r.get(22)?, None,
+            ))
+        })
+        .map_err(|e| e.to_string())?;
+    let mut out = Vec::new();
+    for r in rows_iter {
+        out.push(r.map_err(|e| e.to_string())?);
+    }
+    Ok(out)
 }
 
 #[tauri::command]

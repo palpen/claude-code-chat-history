@@ -22,6 +22,13 @@ pub fn open(path: &Path) -> Result<Connection> {
 
 pub fn init_schema(conn: &Connection) -> Result<()> {
     conn.execute_batch(SCHEMA).context("init schema")?;
+    // Additive migrations for columns introduced after the initial schema.
+    // SQLite returns an error if the column already exists; we swallow it.
+    let _ = conn.execute("ALTER TABLE sessions ADD COLUMN pinned_at INTEGER", []);
+    let _ = conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_sessions_pinned ON sessions(pinned_at) WHERE pinned_at IS NOT NULL",
+        [],
+    );
     Ok(())
 }
 
@@ -50,7 +57,8 @@ CREATE TABLE IF NOT EXISTS sessions (
     estimated_cost_usd      REAL NOT NULL,
     has_errors              INTEGER NOT NULL,
     file_path               TEXT NOT NULL,
-    file_mtime_ms           INTEGER NOT NULL
+    file_mtime_ms           INTEGER NOT NULL,
+    pinned_at               INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_sessions_started  ON sessions(started_at_ms DESC);
