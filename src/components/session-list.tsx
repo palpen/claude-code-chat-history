@@ -9,6 +9,7 @@ import {
 import {
   cn,
   formatRelative,
+  isMac,
   sanitizeSnippet,
   shortProject,
 } from "@/lib/utils";
@@ -202,7 +203,7 @@ export function SessionList(props: Props) {
         <input
           ref={props.searchInputRef}
           type="text"
-          placeholder="Search conversations…"
+          placeholder={`Search conversations… (${isMac() ? "⌘" : "Ctrl+"}K)`}
           value={props.query}
           onChange={(e) => props.onQueryChange(e.target.value)}
           className="w-full rounded-md px-3 py-2 text-sm outline-none focus:ring-2"
