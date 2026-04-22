@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import {
+  generateSummary,
   listPinnedSessions,
   listProjects,
   listSessions,
@@ -10,6 +11,7 @@ import { SessionList } from "@/components/session-list";
 import { SessionDetail } from "@/components/session-detail";
 import { TabBar } from "@/components/tab-bar";
 import { StatsView } from "@/components/stats-view";
+import { TldrReadyBanner } from "@/components/tldr-ready-banner";
 import { isMac } from "@/lib/utils";
 
 const DEFAULT_LEFT_WIDTH = 380;
@@ -23,6 +25,19 @@ export default function App() {
   const [projects, setProjects] = useState<Array<[string, number]>>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Background TLDR generation state. Lives at the App level so the in-flight
+  // state survives navigation and the completion handler can patch the correct
+  // session by ID (not by stale closure).
+  const [pendingTldrs, setPendingTldrs] = useState<Set<string>>(new Set());
+  const [tldrErrors, setTldrErrors] = useState<Map<string, string>>(new Map());
+  const [tldrReady, setTldrReady] = useState<
+    { sessionId: string; title: string } | null
+  >(null);
+  const selectedIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
 
   const [tab, setTab] = useState<"sessions" | "stats">("sessions");
   // Ref so keyboard handlers can read current tab without stale closures
@@ -203,13 +218,59 @@ export default function App() {
     return () => window.removeEventListener("keydown", handler);
   }, [query]);
 
-  const onSessionPatched = useCallback((patched: SessionRow) => {
-    setSessions((rows) =>
-      rows.map((r) => (r.session_id === patched.session_id ? patched : r))
-    );
-    setPinnedSessions((rows) =>
-      rows.map((r) => (r.session_id === patched.session_id ? patched : r))
-    );
+  const generateTldr = useCallback(
+    async (sessionId: string, title: string) => {
+      setPendingTldrs((s) => {
+        if (s.has(sessionId)) return s;
+        const n = new Set(s);
+        n.add(sessionId);
+        return n;
+      });
+      setTldrErrors((m) => {
+        if (!m.has(sessionId)) return m;
+        const n = new Map(m);
+        n.delete(sessionId);
+        return n;
+      });
+      try {
+        const summary = await generateSummary(sessionId);
+        setSessions((rows) =>
+          rows.map((r) =>
+            r.session_id === sessionId ? { ...r, ai_summary: summary } : r
+          )
+        );
+        setPinnedSessions((rows) =>
+          rows.map((r) =>
+            r.session_id === sessionId ? { ...r, ai_summary: summary } : r
+          )
+        );
+        if (selectedIdRef.current !== sessionId) {
+          setTldrReady({ sessionId, title });
+        }
+      } catch (e) {
+        setTldrErrors((m) => {
+          const n = new Map(m);
+          n.set(sessionId, String(e));
+          return n;
+        });
+      } finally {
+        setPendingTldrs((s) => {
+          if (!s.has(sessionId)) return s;
+          const n = new Set(s);
+          n.delete(sessionId);
+          return n;
+        });
+      }
+    },
+    []
+  );
+
+  const dismissTldrReady = useCallback(() => setTldrReady(null), []);
+  const jumpToTldrReady = useCallback(() => {
+    setTldrReady((ready) => {
+      if (ready) setSelectedId(ready.sessionId);
+      return null;
+    });
   }, []);
 
   const onPinToggled = useCallback(() => {
@@ -260,6 +321,7 @@ export default function App() {
               loading={loading}
               searchInputRef={searchInputRef}
               onPinToggled={onPinToggled}
+              pendingTldrs={pendingTldrs}
             />
           </div>
           <div
@@ -270,8 +332,10 @@ export default function App() {
           <div className="flex-1 min-w-0">
             <SessionDetail
               session={selected}
-              onSessionPatched={onSessionPatched}
               onPinToggled={onPinToggled}
+              pendingTldrs={pendingTldrs}
+              tldrErrors={tldrErrors}
+              onGenerateTldr={generateTldr}
             />
           </div>
         </div>
@@ -279,6 +343,13 @@ export default function App() {
         <div className="flex-1 min-h-0 overflow-hidden">
           <StatsView />
         </div>
+      )}
+      {tldrReady && tldrReady.sessionId !== selectedId && (
+        <TldrReadyBanner
+          title={tldrReady.title}
+          onJump={jumpToTldrReady}
+          onDismiss={dismissTldrReady}
+        />
       )}
     </div>
   );
