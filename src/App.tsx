@@ -8,6 +8,8 @@ import {
 } from "@/lib/ipc";
 import { SessionList } from "@/components/session-list";
 import { SessionDetail } from "@/components/session-detail";
+import { TabBar } from "@/components/tab-bar";
+import { StatsView } from "@/components/stats-view";
 import { isMac } from "@/lib/utils";
 
 const DEFAULT_LEFT_WIDTH = 380;
@@ -21,6 +23,13 @@ export default function App() {
   const [projects, setProjects] = useState<Array<[string, number]>>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const [tab, setTab] = useState<"sessions" | "stats">("sessions");
+  // Ref so keyboard handlers can read current tab without stale closures
+  const tabRef = useRef<"sessions" | "stats">("sessions");
+  useEffect(() => {
+    tabRef.current = tab;
+  }, [tab]);
 
   const [leftWidth, setLeftWidth] = useState(DEFAULT_LEFT_WIDTH);
   const dragRef = useRef<{ startX: number; startW: number } | null>(null);
@@ -105,6 +114,7 @@ export default function App() {
   // Arrow-key navigation across the session list (visual order).
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (tabRef.current !== "sessions") return;
       if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
       const target = e.target as HTMLElement | null;
       if (target?.isContentEditable) return;
@@ -139,13 +149,28 @@ export default function App() {
     el?.scrollIntoView({ block: "nearest" });
   }, [selectedId]);
 
-  // Shortcuts to focus and clear the search input.
+  // Shortcuts to focus and clear the search input; also handles tab switching.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       const input = searchInputRef.current;
 
       const modKey = isMac() ? e.metaKey : e.ctrlKey;
+
+      // Tab switch shortcuts work on all tabs
+      if (modKey && !e.shiftKey && !e.altKey && e.key === "1") {
+        e.preventDefault();
+        setTab("sessions");
+        return;
+      }
+      if (modKey && !e.shiftKey && !e.altKey && e.key === "2") {
+        e.preventDefault();
+        setTab("stats");
+        return;
+      }
+
+      if (tabRef.current !== "sessions") return;
+
       if (modKey && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "k") {
         e.preventDefault();
         input?.focus();
@@ -212,37 +237,49 @@ export default function App() {
   };
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden" style={{ background: "var(--surface)" }}>
-      <div style={{ width: leftWidth, flex: "0 0 auto" }}>
-        <SessionList
-          sessions={sessions}
-          pinnedSessions={pinnedSessions}
-          projects={projects}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-          query={query}
-          onQueryChange={setQuery}
-          projectFilter={projectFilter}
-          onProjectFilterChange={setProjectFilter}
-          modelFilter={modelFilter}
-          onModelFilterChange={setModelFilter}
-          loading={loading}
-          searchInputRef={searchInputRef}
-          onPinToggled={onPinToggled}
-        />
-      </div>
-      <div
-        onMouseDown={onDragStart}
-        className="w-1 cursor-col-resize"
-        style={{ background: "var(--border)" }}
-      />
-      <div className="flex-1 min-w-0">
-        <SessionDetail
-          session={selected}
-          onSessionPatched={onSessionPatched}
-          onPinToggled={onPinToggled}
-        />
-      </div>
+    <div
+      className="flex flex-col h-screen w-screen overflow-hidden"
+      style={{ background: "var(--surface)" }}
+    >
+      <TabBar tab={tab} onChange={setTab} />
+      {tab === "sessions" ? (
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          <div style={{ width: leftWidth, flex: "0 0 auto" }}>
+            <SessionList
+              sessions={sessions}
+              pinnedSessions={pinnedSessions}
+              projects={projects}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              query={query}
+              onQueryChange={setQuery}
+              projectFilter={projectFilter}
+              onProjectFilterChange={setProjectFilter}
+              modelFilter={modelFilter}
+              onModelFilterChange={setModelFilter}
+              loading={loading}
+              searchInputRef={searchInputRef}
+              onPinToggled={onPinToggled}
+            />
+          </div>
+          <div
+            onMouseDown={onDragStart}
+            className="w-1 cursor-col-resize"
+            style={{ background: "var(--border)" }}
+          />
+          <div className="flex-1 min-w-0">
+            <SessionDetail
+              session={selected}
+              onSessionPatched={onSessionPatched}
+              onPinToggled={onPinToggled}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0 overflow-hidden">
+          <StatsView />
+        </div>
+      )}
     </div>
   );
 }
