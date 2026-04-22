@@ -57,6 +57,31 @@ pub struct ListArgs {
     pub started_before_ms: Option<i64>,
     #[serde(default)]
     pub limit: Option<u32>,
+    #[serde(default)]
+    pub sort_by: Option<String>,
+}
+
+/// Map a UI sort key to a safe ORDER BY fragment. When a search query is
+/// active and the user hasn't picked an explicit sort, fall back to bm25
+/// relevance so typing still surfaces the best matches first. Every other
+/// sort gets `started_at_ms DESC` as a stable tiebreaker — that column is
+/// indexed, so the tiebreaker is free. Returns a `&'static str`, which makes
+/// concatenation into dynamic SQL injection-safe.
+fn order_clause(sort_by: Option<&str>, has_query: bool) -> &'static str {
+    match sort_by.unwrap_or("newest") {
+        "oldest" => "started_at_ms ASC",
+        "modified" => "ended_at_ms DESC, started_at_ms DESC",
+        "project" => "project_dir ASC, started_at_ms DESC",
+        "messages" => "message_count DESC, started_at_ms DESC",
+        "cost" => "estimated_cost_usd DESC, started_at_ms DESC",
+        _ => {
+            if has_query {
+                "bm25(sessions_fts, 10.0, 8.0, 6.0, 5.0, 1.0)"
+            } else {
+                "started_at_ms DESC"
+            }
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -137,6 +162,7 @@ pub fn list_sessions(state: State<'_, AppState>, args: ListArgs) -> std::result:
     if has_query {
         let raw = args.query.unwrap();
         let match_expr = build_match_expression(&raw);
+        let order_by = order_clause(args.sort_by.as_deref(), true);
 
         let sql = format!(
             r#"
@@ -156,7 +182,7 @@ pub fn list_sessions(state: State<'_, AppState>, args: ListArgs) -> std::result:
                   {model_filter}
                   {started_after}
                   {started_before}
-            ORDER BY bm25(sessions_fts, 10.0, 8.0, 6.0, 5.0, 1.0)
+            ORDER BY {order_by}
             LIMIT ?2
             "#,
             proj_filter = if args.project_dir.is_some() { "AND s.project_dir = ?3" } else { "" },
@@ -165,6 +191,7 @@ pub fn list_sessions(state: State<'_, AppState>, args: ListArgs) -> std::result:
             } else { "" },
             started_after = "",
             started_before = "",
+            order_by = order_by,
         );
 
         let mut stmt = conn.prepare(&sql).map_err(|e| e.to_string())?;
@@ -220,6 +247,7 @@ pub fn list_sessions(state: State<'_, AppState>, args: ListArgs) -> std::result:
 
         params_vec.push(SqlValue::Integer(limit));
         let limit_idx = params_vec.len();
+        let order_by = order_clause(args.sort_by.as_deref(), false);
 
         let sql = format!(
             r#"
@@ -233,7 +261,7 @@ pub fn list_sessions(state: State<'_, AppState>, args: ListArgs) -> std::result:
                    claude_version, pinned_at
             FROM sessions
             {where_clause}
-            ORDER BY started_at_ms DESC
+            ORDER BY {order_by}
             LIMIT ?{limit_idx}
             "#
         );
@@ -330,6 +358,7 @@ pub fn get_session(
         started_after_ms: None,
         started_before_ms: None,
         limit: Some(500),
+        sort_by: None,
     };
     // Reuse list with a direct ID filter — cheaper to write a targeted query.
     drop(args);
