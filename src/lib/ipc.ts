@@ -105,3 +105,31 @@ export async function setSessionPinned(sessionId: string, pinned: boolean): Prom
 export async function listPinnedSessions(): Promise<SessionRow[]> {
   return invoke<SessionRow[]>("list_pinned_sessions");
 }
+
+export interface WeeklyBucket {
+  week_start_ms: number;
+  sessions: number;
+  messages: number;
+  cost_usd: number;
+}
+
+export interface GlobalStats {
+  total_sessions: number;
+  total_messages: number;
+  total_user_messages: number;
+  total_assistant_messages: number;
+  total_input_tokens: number;
+  total_output_tokens: number;
+  total_cache_read_tokens: number;
+  total_cache_creation_tokens: number;
+  total_cost_usd: number;
+  sessions_today: number;
+  sessions_this_week: number;
+  first_session_ms: number | null;
+  last_session_ms: number | null;
+  top_projects: [string, number][];
+  top_models: [string, number][];
+  weekly_activity: WeeklyBucket[];
+}
+
+export const globalStats = (): Promise<GlobalStats> => invoke<GlobalStats>("global_stats");

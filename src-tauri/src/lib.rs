@@ -47,6 +47,7 @@ pub fn run() {
             commands::reindex,
             commands::set_session_pinned,
             commands::list_pinned_sessions,
+            commands::global_stats,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
