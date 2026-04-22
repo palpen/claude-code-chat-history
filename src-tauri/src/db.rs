@@ -29,6 +29,17 @@ pub fn init_schema(conn: &Connection) -> Result<()> {
         "CREATE INDEX IF NOT EXISTS idx_sessions_pinned ON sessions(pinned_at) WHERE pinned_at IS NOT NULL",
         [],
     );
+    // ALTER returns Ok only on the first launch after the column is added.
+    // Use that as the one-shot trigger to invalidate cached mtimes so the next
+    // full_scan re-parses every JSONL and backfills recap_summary.
+    // ai_summary and pinned_at are preserved — the upsert UPDATE clause doesn't
+    // touch them.
+    if conn
+        .execute("ALTER TABLE sessions ADD COLUMN recap_summary TEXT", [])
+        .is_ok()
+    {
+        let _ = conn.execute("UPDATE sessions SET file_mtime_ms = 0", []);
+    }
     Ok(())
 }
 
@@ -42,6 +53,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     custom_title            TEXT,
     first_user_msg          TEXT,
     ai_summary              TEXT,
+    recap_summary           TEXT,
     started_at_ms           INTEGER NOT NULL,
     ended_at_ms             INTEGER NOT NULL,
     message_count           INTEGER NOT NULL,

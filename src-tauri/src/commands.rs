@@ -21,6 +21,7 @@ pub struct SessionRow {
     pub custom_title: Option<String>,
     pub first_user_msg: Option<String>,
     pub ai_summary: Option<String>,
+    pub recap_summary: Option<String>,
     pub started_at_ms: i64,
     pub ended_at_ms: i64,
     pub message_count: i64,
@@ -58,6 +59,7 @@ pub struct ListArgs {
     pub limit: Option<u32>,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn row_from_raw(
     session_id: String,
     project_dir: String,
@@ -66,6 +68,7 @@ fn row_from_raw(
     custom_title: Option<String>,
     first_user_msg: Option<String>,
     ai_summary: Option<String>,
+    recap_summary: Option<String>,
     started_at_ms: i64,
     ended_at_ms: i64,
     message_count: i64,
@@ -96,6 +99,7 @@ fn row_from_raw(
         custom_title,
         first_user_msg,
         ai_summary,
+        recap_summary,
         started_at_ms,
         ended_at_ms,
         message_count,
@@ -137,7 +141,7 @@ pub fn list_sessions(state: State<'_, AppState>, args: ListArgs) -> std::result:
         let sql = format!(
             r#"
             SELECT s.session_id, s.project_dir, s.cwd, s.git_branch,
-                   s.custom_title, s.first_user_msg, s.ai_summary,
+                   s.custom_title, s.first_user_msg, s.ai_summary, s.recap_summary,
                    s.started_at_ms, s.ended_at_ms,
                    s.message_count, s.user_message_count, s.assistant_message_count,
                    s.input_tokens, s.output_tokens, s.cache_read_tokens, s.cache_creation_tokens,
@@ -181,7 +185,7 @@ pub fn list_sessions(state: State<'_, AppState>, args: ListArgs) -> std::result:
                     r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?,
                     r.get(7)?, r.get(8)?, r.get(9)?, r.get(10)?, r.get(11)?, r.get(12)?, r.get(13)?,
                     r.get(14)?, r.get(15)?, r.get(16)?, r.get(17)?, r.get(18)?, r.get(19)?, r.get(20)?,
-                    r.get(21)?, r.get(22)?, r.get(23)?,
+                    r.get(21)?, r.get(22)?, r.get(23)?, r.get(24)?,
                 ))
             })
             .map_err(|e| e.to_string())?;
@@ -220,7 +224,7 @@ pub fn list_sessions(state: State<'_, AppState>, args: ListArgs) -> std::result:
         let sql = format!(
             r#"
             SELECT session_id, project_dir, cwd, git_branch,
-                   custom_title, first_user_msg, ai_summary,
+                   custom_title, first_user_msg, ai_summary, recap_summary,
                    started_at_ms, ended_at_ms,
                    message_count, user_message_count, assistant_message_count,
                    input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
@@ -244,7 +248,7 @@ pub fn list_sessions(state: State<'_, AppState>, args: ListArgs) -> std::result:
                     r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?,
                     r.get(7)?, r.get(8)?, r.get(9)?, r.get(10)?, r.get(11)?, r.get(12)?, r.get(13)?,
                     r.get(14)?, r.get(15)?, r.get(16)?, r.get(17)?, r.get(18)?, r.get(19)?, r.get(20)?,
-                    r.get(21)?, r.get(22)?, None,
+                    r.get(21)?, r.get(22)?, r.get(23)?, None,
                 ))
             })
             .map_err(|e| e.to_string())?;
@@ -334,7 +338,7 @@ pub fn get_session(
         .query_row(
             r#"
             SELECT session_id, project_dir, cwd, git_branch,
-                   custom_title, first_user_msg, ai_summary,
+                   custom_title, first_user_msg, ai_summary, recap_summary,
                    started_at_ms, ended_at_ms,
                    message_count, user_message_count, assistant_message_count,
                    input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
@@ -349,7 +353,7 @@ pub fn get_session(
                     r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?,
                     r.get(7)?, r.get(8)?, r.get(9)?, r.get(10)?, r.get(11)?, r.get(12)?, r.get(13)?,
                     r.get(14)?, r.get(15)?, r.get(16)?, r.get(17)?, r.get(18)?, r.get(19)?, r.get(20)?,
-                    r.get(21)?, r.get(22)?, None,
+                    r.get(21)?, r.get(22)?, r.get(23)?, None,
                 ))
             },
         )
@@ -506,7 +510,7 @@ pub fn list_pinned_sessions(
         .prepare(
             r#"
             SELECT session_id, project_dir, cwd, git_branch,
-                   custom_title, first_user_msg, ai_summary,
+                   custom_title, first_user_msg, ai_summary, recap_summary,
                    started_at_ms, ended_at_ms,
                    message_count, user_message_count, assistant_message_count,
                    input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
@@ -525,7 +529,7 @@ pub fn list_pinned_sessions(
                 r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?, r.get(5)?, r.get(6)?,
                 r.get(7)?, r.get(8)?, r.get(9)?, r.get(10)?, r.get(11)?, r.get(12)?, r.get(13)?,
                 r.get(14)?, r.get(15)?, r.get(16)?, r.get(17)?, r.get(18)?, r.get(19)?, r.get(20)?,
-                r.get(21)?, r.get(22)?, None,
+                r.get(21)?, r.get(22)?, r.get(23)?, None,
             ))
         })
         .map_err(|e| e.to_string())?;

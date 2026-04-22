@@ -169,13 +169,13 @@ fn write_session(
         r#"
         INSERT INTO sessions (
             session_id, project_dir, cwd, git_branch, claude_version,
-            custom_title, first_user_msg, ai_summary,
+            custom_title, first_user_msg, ai_summary, recap_summary,
             started_at_ms, ended_at_ms,
             message_count, user_message_count, assistant_message_count,
             tool_calls_json, files_touched_json, models_used_json,
             input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
             estimated_cost_usd, has_errors, file_path, file_mtime_ms
-        ) VALUES (?1,?2,?3,?4,?5,?6,?7,NULL,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23)
+        ) VALUES (?1,?2,?3,?4,?5,?6,?7,NULL,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19,?20,?21,?22,?23,?24)
         ON CONFLICT(session_id) DO UPDATE SET
             project_dir=excluded.project_dir,
             cwd=excluded.cwd,
@@ -183,6 +183,7 @@ fn write_session(
             claude_version=excluded.claude_version,
             custom_title=excluded.custom_title,
             first_user_msg=excluded.first_user_msg,
+            recap_summary=excluded.recap_summary,
             started_at_ms=excluded.started_at_ms,
             ended_at_ms=excluded.ended_at_ms,
             message_count=excluded.message_count,
@@ -208,6 +209,7 @@ fn write_session(
             s.claude_version,
             s.custom_title,
             s.first_user_msg,
+            s.recap_summary,
             s.started_at_ms,
             s.ended_at_ms,
             s.message_count as i64,

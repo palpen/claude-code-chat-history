@@ -10,6 +10,7 @@ export interface SessionRow {
   custom_title: string | null;
   first_user_msg: string | null;
   ai_summary: string | null;
+  recap_summary: string | null;
   started_at_ms: number;
   ended_at_ms: number;
   message_count: number;
