@@ -42,6 +42,7 @@ pub struct ParsedSession {
     pub git_branch: Option<String>,
     pub claude_version: Option<String>,
     pub custom_title: Option<String>,
+    pub recap_summary: Option<String>,
     pub first_user_msg: Option<String>,
     pub started_at_ms: i64,
     pub ended_at_ms: i64,
@@ -233,6 +234,18 @@ pub fn parse_session_file(path: &Path, project_dir: &str) -> Result<(ParsedSessi
             "custom-title" => {
                 if let Some(t) = v.get("customTitle").and_then(|x| x.as_str()) {
                     sess.custom_title = Some(t.to_string());
+                }
+            }
+            // Claude Code writes `type: "system", subtype: "away_summary"` when the user
+            // returns to a session after a gap — the "※ recap" blurb. JSONL is append-only
+            // so overwriting yields the latest recap.
+            "system" => {
+                if v.get("subtype").and_then(|x| x.as_str()) == Some("away_summary") {
+                    if let Some(c) = v.get("content").and_then(|x| x.as_str()) {
+                        if !c.is_empty() {
+                            sess.recap_summary = Some(c.to_string());
+                        }
+                    }
                 }
             }
             "user" => {
