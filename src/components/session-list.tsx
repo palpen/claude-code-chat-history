@@ -216,7 +216,7 @@ export function SessionList(props: Props) {
           <select
             value={props.projectFilter ?? ""}
             onChange={(e) => props.onProjectFilterChange(e.target.value || null)}
-            className="flex-1 rounded-md px-2 py-1 outline-none"
+            className="min-w-0 flex-1 rounded-md px-2 py-1 outline-none"
             style={{
               background: "var(--surface)",
               color: "var(--text)",
@@ -247,24 +247,25 @@ export function SessionList(props: Props) {
               </option>
             ))}
           </select>
-          <select
-            value={props.sortBy}
-            onChange={(e) => props.onSortByChange(e.target.value as SortKey)}
-            className="rounded-md px-2 py-1 outline-none"
-            style={{
-              background: "var(--surface)",
-              color: "var(--text)",
-              border: "1px solid var(--border)",
-            }}
-            title="Sort sessions"
-          >
-            {SORT_OPTIONS.map((opt) => (
-              <option key={opt.key} value={opt.key}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
         </div>
+        <select
+          value={props.sortBy}
+          onChange={(e) => props.onSortByChange(e.target.value as SortKey)}
+          className="w-full rounded-md px-2 py-1 text-xs outline-none"
+          style={{
+            background: "var(--surface)",
+            color: "var(--text)",
+            border: "1px solid var(--border)",
+          }}
+          title="Sort sessions"
+          aria-label="Sort sessions"
+        >
+          {SORT_OPTIONS.map((opt) => (
+            <option key={opt.key} value={opt.key}>
+              Sort: {opt.label}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="flex-1 overflow-y-auto">
