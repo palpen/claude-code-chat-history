@@ -1,5 +1,5 @@
 import { useMemo, useState, type Ref } from "react";
-import { Star } from "lucide-react";
+import { Loader2, Star } from "lucide-react";
 import { setSessionPinned, type SessionRow } from "@/lib/ipc";
 import {
   cn,
@@ -23,6 +23,7 @@ interface Props {
   loading: boolean;
   searchInputRef?: Ref<HTMLInputElement>;
   onPinToggled: () => void;
+  pendingTldrs: Set<string>;
 }
 
 function stripCaveat(raw: string): string {
@@ -91,6 +92,7 @@ export function SessionList(props: Props) {
     const uniqueModels = Array.from(new Set(models));
     const isSelected = s.session_id === props.selectedId;
     const isPinned = s.pinned_at !== null;
+    const isGeneratingTldr = props.pendingTldrs.has(s.session_id);
     return (
       <div
         key={s.session_id}
@@ -150,6 +152,17 @@ export function SessionList(props: Props) {
             )}
             {s.has_errors && (
               <span style={{ color: "var(--danger)" }}>· errors</span>
+            )}
+            {isGeneratingTldr && (
+              <span
+                className="inline-flex items-center gap-1"
+                style={{ color: "var(--accent)" }}
+                title="Generating TLDR…"
+                aria-label="Generating TLDR"
+              >
+                <span aria-hidden="true">·</span>
+                <Loader2 size={11} className="animate-spin" strokeWidth={2} />
+              </span>
             )}
           </div>
         </button>

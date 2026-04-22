@@ -5,7 +5,6 @@ import { Star } from "lucide-react";
 import {
   copyResumeCommand,
   exportMarkdown,
-  generateSummary,
   getTranscript,
   saveMarkdownToDisk,
   setSessionPinned,
@@ -24,8 +23,10 @@ import { Transcript } from "./transcript";
 
 interface Props {
   session: SessionRow | null;
-  onSessionPatched: (s: SessionRow) => void;
   onPinToggled: () => void;
+  pendingTldrs: Set<string>;
+  tldrErrors: Map<string, string>;
+  onGenerateTldr: (sessionId: string, title: string) => void;
 }
 
 function heuristicTldr(s: SessionRow): string {
@@ -34,16 +35,22 @@ function heuristicTldr(s: SessionRow): string {
   return "(no user prompts in this session)";
 }
 
-export function SessionDetail({ session, onSessionPatched, onPinToggled }: Props) {
+export function SessionDetail({
+  session,
+  onPinToggled,
+  pendingTldrs,
+  tldrErrors,
+  onGenerateTldr,
+}: Props) {
   const [turns, setTurns] = useState<Turn[]>([]);
-  const [summaryBusy, setSummaryBusy] = useState(false);
-  const [summaryError, setSummaryError] = useState<string | null>(null);
   const [resumeCopied, setResumeCopied] = useState(false);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
 
+  const summaryBusy = session ? pendingTldrs.has(session.session_id) : false;
+  const summaryError = session ? tldrErrors.get(session.session_id) ?? null : null;
+
   useEffect(() => {
     setTurns([]);
-    setSummaryError(null);
     setResumeCopied(false);
     setExportStatus(null);
     if (!session) return;
@@ -78,19 +85,14 @@ export function SessionDetail({ session, onSessionPatched, onPinToggled }: Props
     setTimeout(() => setResumeCopied(false), 2000);
   }, [session?.session_id]);
 
-  const onGenerateSummary = useCallback(async () => {
+  const onGenerateSummary = useCallback(() => {
     if (!session) return;
-    setSummaryBusy(true);
-    setSummaryError(null);
-    try {
-      const summary = await generateSummary(session.session_id);
-      onSessionPatched({ ...session, ai_summary: summary });
-    } catch (e) {
-      setSummaryError(String(e));
-    } finally {
-      setSummaryBusy(false);
-    }
-  }, [session, onSessionPatched]);
+    const title =
+      session.custom_title ||
+      session.first_user_msg?.split("\n")[0]?.slice(0, 120) ||
+      `Session ${session.session_id.slice(0, 8)}`;
+    onGenerateTldr(session.session_id, title);
+  }, [session, onGenerateTldr]);
 
   const onExport = useCallback(async () => {
     if (!session) return;
