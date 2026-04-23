@@ -167,6 +167,10 @@ function TurnCard({
   const hasText = turn.text.trim().length > 0;
   const isToolOnly = !hasText && turn.tool_uses.length > 0;
 
+  useEffect(() => {
+    setToolsOpen(!hideToolCalls);
+  }, [hideToolCalls]);
+
   const components = useMemo(
     () => makeMarkdownComponents(query, currentInTurn),
     [query, currentInTurn]
