@@ -18,6 +18,7 @@ import {
   formatNumber,
   shortProject,
 } from "@/lib/utils";
+import { useHideToolCalls } from "@/lib/prefs";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { Transcript } from "./transcript";
 
@@ -45,6 +46,7 @@ export function SessionDetail({
   const [turns, setTurns] = useState<Turn[]>([]);
   const [resumeCopied, setResumeCopied] = useState(false);
   const [exportStatus, setExportStatus] = useState<string | null>(null);
+  const [hideToolCalls, setHideToolCalls] = useHideToolCalls();
 
   const summaryBusy = session ? pendingTldrs.has(session.session_id) : false;
   const summaryError = session ? tldrErrors.get(session.session_id) ?? null : null;
@@ -208,6 +210,17 @@ export function SessionDetail({
                 Open cwd
               </button>
             )}
+            <button
+              onClick={() => setHideToolCalls(!hideToolCalls)}
+              className="rounded-md border px-3 py-1.5 text-xs font-medium"
+              style={{
+                background: "var(--surface)",
+                borderColor: "var(--border)",
+                color: "var(--text)",
+              }}
+            >
+              {hideToolCalls ? "Show tool calls" : "Hide tool calls"}
+            </button>
           </div>
         </div>
         <div
@@ -406,7 +419,7 @@ export function SessionDetail({
       )}
 
       <div className="flex-1 min-h-0">
-        <Transcript turns={turns} />
+        <Transcript turns={turns} hideToolCalls={hideToolCalls} />
       </div>
     </div>
   );
