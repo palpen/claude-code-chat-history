@@ -17,6 +17,7 @@ import type { Turn } from "@/lib/ipc";
 
 interface Props {
   turns: Turn[];
+  hideToolCalls?: boolean;
 }
 
 interface Match {
@@ -153,19 +154,47 @@ function TurnCard({
   turn,
   query,
   currentInTurn,
+  hideToolCalls = false,
 }: {
   turn: Turn;
   query: string;
   currentInTurn: number | null;
+  hideToolCalls?: boolean;
 }) {
-  const [toolsOpen, setToolsOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(!hideToolCalls);
   const isUser = turn.role === "user";
   const isAssistant = turn.role === "assistant";
+  const hasText = turn.text.trim().length > 0;
+  const isToolOnly = !hasText && turn.tool_uses.length > 0;
+
+  useEffect(() => {
+    setToolsOpen(!hideToolCalls);
+  }, [hideToolCalls]);
 
   const components = useMemo(
     () => makeMarkdownComponents(query, currentInTurn),
     [query, currentInTurn]
   );
+
+  if (hideToolCalls && isToolOnly && !toolsOpen) {
+    const names = turn.tool_uses.slice(0, 4).map((t) => t.name).join(", ");
+    const extra =
+      turn.tool_uses.length > 4 ? ` +${turn.tool_uses.length - 4}` : "";
+    return (
+      <button
+        onClick={() => setToolsOpen(true)}
+        className="flex w-full items-center gap-2 px-5 py-1 text-left text-xs"
+        style={{ background: "var(--surface)", color: "var(--text-muted)" }}
+        title="Click to expand tool call"
+      >
+        <span aria-hidden>🔧</span>
+        <span className="truncate font-mono">
+          {names}
+          {extra}
+        </span>
+      </button>
+    );
+  }
 
   return (
     <div
@@ -194,14 +223,29 @@ function TurnCard({
 
       {turn.tool_uses.length > 0 && (
         <div className="mt-2">
-          <button
-            onClick={() => setToolsOpen((o) => !o)}
-            className="text-xs underline-offset-2 hover:underline"
-            style={{ color: "var(--text-muted)" }}
-          >
-            {toolsOpen ? "Hide" : "Show"} {turn.tool_uses.length} tool call
-            {turn.tool_uses.length === 1 ? "" : "s"}
-          </button>
+          {hideToolCalls ? (
+            <button
+              onClick={() => setToolsOpen((o) => !o)}
+              className="rounded px-2 py-1 text-xs"
+              style={{
+                background: "var(--surface-2)",
+                border: "1px solid var(--border)",
+                color: "var(--text-muted)",
+              }}
+            >
+              🔧 {turn.tool_uses.length} tool call
+              {turn.tool_uses.length === 1 ? "" : "s"}
+            </button>
+          ) : (
+            <button
+              onClick={() => setToolsOpen((o) => !o)}
+              className="text-xs underline-offset-2 hover:underline"
+              style={{ color: "var(--text-muted)" }}
+            >
+              {toolsOpen ? "Hide" : "Show"} {turn.tool_uses.length} tool call
+              {turn.tool_uses.length === 1 ? "" : "s"}
+            </button>
+          )}
           {toolsOpen && (
             <div className="mt-2 space-y-2">
               {turn.tool_uses.map((tu) => (
@@ -232,7 +276,7 @@ function TurnCard({
   );
 }
 
-export function Transcript({ turns }: Props) {
+export function Transcript({ turns, hideToolCalls = false }: Props) {
   const parentRef = useRef<HTMLDivElement>(null);
   const findInputRef = useRef<HTMLInputElement>(null);
 
@@ -475,6 +519,7 @@ export function Transcript({ turns }: Props) {
                   turn={turn}
                   query={findQuery.trim()}
                   currentInTurn={currentInTurn}
+                  hideToolCalls={hideToolCalls}
                 />
               </div>
             );
