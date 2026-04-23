@@ -164,11 +164,33 @@ function TurnCard({
   const [toolsOpen, setToolsOpen] = useState(!hideToolCalls);
   const isUser = turn.role === "user";
   const isAssistant = turn.role === "assistant";
+  const hasText = turn.text.trim().length > 0;
+  const isToolOnly = !hasText && turn.tool_uses.length > 0;
 
   const components = useMemo(
     () => makeMarkdownComponents(query, currentInTurn),
     [query, currentInTurn]
   );
+
+  if (hideToolCalls && isToolOnly && !toolsOpen) {
+    const names = turn.tool_uses.slice(0, 4).map((t) => t.name).join(", ");
+    const extra =
+      turn.tool_uses.length > 4 ? ` +${turn.tool_uses.length - 4}` : "";
+    return (
+      <button
+        onClick={() => setToolsOpen(true)}
+        className="flex w-full items-center gap-2 px-5 py-1 text-left text-xs"
+        style={{ background: "var(--surface)", color: "var(--text-muted)" }}
+        title="Click to expand tool call"
+      >
+        <span aria-hidden>🔧</span>
+        <span className="truncate font-mono">
+          {names}
+          {extra}
+        </span>
+      </button>
+    );
+  }
 
   return (
     <div
