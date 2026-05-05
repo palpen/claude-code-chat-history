@@ -1,6 +1,6 @@
 [package]
 name = "claude-code-chat-history"
-version = "0.2.0"
+version = "0.2.1"
 description = "Browse, search, and resurface past Claude Code sessions."
 authors = ["pspenano"]
 edition = "2021"
