@@ -89,4 +89,14 @@ The "Est. API cost" field is the **hypothetical** cost if every token in a sessi
 
 ## License
 
-MIT.
+Palermo Penano's original contributions are licensed under the [MIT License](LICENSE),
+Copyright (c) 2026 Palermo Penano. LICENSE specifies the covered files and
+exclusions. Third-party scaffold code and assets retain the terms in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+The Tauri logo and bundled default app icons are excluded from the MIT grant.
+Tauri's trademark guidelines say applications should not ship with the default
+icon; release branding requires replacement with appropriately licensed artwork
+or separate permission. The Vite and React SVGs retain their upstream template
+terms, which do not grant trademark rights. This documentation update does not
+clear existing release artifacts or change any code or assets.
